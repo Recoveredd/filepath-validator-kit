@@ -1,5 +1,5 @@
 {
-  "name": "path-vet",
+  "name": "filepath-validator-kit",
   "version": "0.1.0",
   "description": "Validate file paths with portable, POSIX, or Windows diagnostics.",
   "type": "module",

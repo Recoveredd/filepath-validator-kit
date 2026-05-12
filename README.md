@@ -1,9 +1,9 @@
-# path-vet
+# filepath-validator-kit
 
 Validate file paths with explicit platform policies and structured diagnostics.
 
 ```ts
-import { isValidPath, vetPath } from "path-vet";
+import { isValidPath, vetPath } from "filepath-validator-kit";
 
 isValidPath("notes/2026-05-12.txt");
 // true
@@ -18,7 +18,7 @@ if (!result.valid) {
 
 ## Why
 
-Some path checks only return `true` or `false`. `path-vet` is for validation flows that need to explain what failed, which segment failed, and whether the policy is POSIX, Windows, or portable across both.
+Some path checks only return `true` or `false`. `filepath-validator-kit` is for validation flows that need to explain what failed, which segment failed, and whether the policy is POSIX, Windows, or portable across both.
 
 ## API
 

@@ -1,4 +1,4 @@
-# Draft report: path-vet
+# Draft report: filepath-validator-kit
 
 ## Candidate
 
@@ -7,7 +7,7 @@
 - Last publish: 2015-05-06
 - License: MIT
 - Repository: `git://github.com/jonschlinkert/is-valid-path.git`
-- Draft package: `path-vet`
+- Draft package: `filepath-validator-kit`
 
 ## Score
 
@@ -45,7 +45,7 @@ This is not a clone of `is-valid-path`: the draft targets callers that need expl
 
 ## Différenciation en 1 journée
 
-`path-vet` can show the exact invalid path segment and issue code under a chosen `portable`, `posix`, or `windows` policy, so a CLI or form can explain and fix the path without reverse-engineering a boolean.
+`filepath-validator-kit` can show the exact invalid path segment and issue code under a chosen `portable`, `posix`, or `windows` policy, so a CLI or form can explain and fix the path without reverse-engineering a boolean.
 
 ## API proposée
 
