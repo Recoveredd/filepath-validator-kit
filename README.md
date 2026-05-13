@@ -8,7 +8,7 @@ Validate file path strings with explicit portable, POSIX or Windows policies and
 
 `filepath-validator-kit` is a small clean-room toolkit for forms, config editors, archive builders and CLIs that need to explain why a user-provided path is unsafe or unsupported. It validates strings only: no filesystem access, no path resolution, no symlink checks and no mutation of user input.
 
-Links: [npm](https://www.npmjs.com/package/filepath-validator-kit) · [GitHub](https://github.com/Recoveredd/filepath-validator-kit)
+Links: [Demo](https://packages.wasta-wocket.fr/filepath-validator-kit/) · [npm](https://www.npmjs.com/package/filepath-validator-kit) · [GitHub](https://github.com/Recoveredd/filepath-validator-kit)
 
 ## Package quality
 
