@@ -7,6 +7,11 @@ describe("vetPath", () => {
       valid: true,
       input: "notes/2026-05-12.txt",
       normalizedSeparators: "notes/2026-05-12.txt",
+      absolute: false,
+      segments: [
+        { value: "notes", index: 0, start: 0, end: 5 },
+        { value: "2026-05-12.txt", index: 1, start: 6, end: 20 }
+      ],
       issues: []
     });
   });
@@ -16,15 +21,17 @@ describe("vetPath", () => {
     expect(vetPath(null).issues[0]?.code).toBe("not-a-string");
   });
 
-  it("reports Windows-reserved names with segment details", () => {
+  it("reports Windows-reserved names with segment details and offsets", () => {
     const result = vetPath("reports/con.txt", { platform: "portable" });
 
     expect(result.valid).toBe(false);
     expect(result.issues).toContainEqual({
       code: "windows-reserved-name",
       message: "Path segment is a Windows-reserved device name.",
-      index: 1,
-      segment: "con.txt"
+      segmentIndex: 1,
+      segment: "con.txt",
+      start: 8,
+      end: 15
     });
   });
 
@@ -42,6 +49,19 @@ describe("vetPath", () => {
     expect(vetPath("tmp/report.txt", { allowRelative: false }).issues[0]?.code).toBe(
       "relative-not-allowed"
     );
+  });
+
+  it("accepts absolute root paths without reporting empty segments", () => {
+    expect(vetPath("/", { platform: "posix" })).toMatchObject({
+      valid: true,
+      absolute: true,
+      issues: []
+    });
+    expect(vetPath("C:\\", { platform: "windows" })).toMatchObject({
+      valid: true,
+      absolute: true,
+      issues: []
+    });
   });
 
   it("rejects traversal and repeated separators unless allowed", () => {
@@ -62,9 +82,11 @@ describe("vetPath", () => {
     ).toBe(true);
   });
 
-  it("checks length limits", () => {
+  it("checks length limits and invalid numeric options", () => {
     expect(vetPath("abcdef", { maxLength: 3 }).issues[0]?.code).toBe("path-too-long");
     expect(vetPath("abc/def", { maxSegmentLength: 2 }).issues[0]?.code).toBe("segment-too-long");
+    expect(vetPath("abc", { maxLength: -1 }).issues[0]?.code).toBe("invalid-option");
+    expect(vetPath("abc", { maxSegmentLength: 1.5 }).issues[0]?.code).toBe("invalid-option");
   });
 
   it("normalizes backslash separators for diagnostics", () => {
@@ -73,8 +95,10 @@ describe("vetPath", () => {
     expect(result.normalizedSeparators).toBe("safe/aux/file.txt");
     expect(result.issues[0]).toMatchObject({
       code: "windows-reserved-name",
-      index: 1,
-      segment: "aux"
+      segmentIndex: 1,
+      segment: "aux",
+      start: 5,
+      end: 8
     });
   });
 });

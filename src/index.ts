@@ -3,6 +3,7 @@ export type PathVetPlatform = "portable" | "posix" | "windows";
 export type PathVetIssueCode =
   | "empty-input"
   | "not-a-string"
+  | "invalid-option"
   | "absolute-not-allowed"
   | "relative-not-allowed"
   | "traversal-not-allowed"
@@ -10,7 +11,6 @@ export type PathVetIssueCode =
   | "segment-too-long"
   | "path-too-long"
   | "nul-byte"
-  | "posix-reserved-character"
   | "windows-reserved-character"
   | "windows-reserved-name"
   | "windows-trailing-dot-or-space";
@@ -28,14 +28,25 @@ export interface PathVetOptions {
 export interface PathVetIssue {
   code: PathVetIssueCode;
   message: string;
-  index?: number;
+  segmentIndex?: number;
   segment?: string;
+  start?: number;
+  end?: number;
+}
+
+export interface PathVetSegment {
+  value: string;
+  index: number;
+  start: number;
+  end: number;
 }
 
 export interface PathVetResult {
   valid: boolean;
   input: unknown;
   normalizedSeparators: string;
+  absolute: boolean;
+  segments: PathVetSegment[];
   issues: PathVetIssue[];
 }
 
@@ -65,6 +76,8 @@ export function vetPath(input: unknown, options: PathVetOptions = {}): PathVetRe
       valid: false,
       input,
       normalizedSeparators: "",
+      absolute: false,
+      segments: [],
       issues: [
         {
           code: "not-a-string",
@@ -75,6 +88,10 @@ export function vetPath(input: unknown, options: PathVetOptions = {}): PathVetRe
   }
 
   const normalizedSeparators = input.replace(/\\/gu, "/");
+  const absolute = isAbsolutePath(input, normalizedSeparators);
+  const rawSegments = splitPathSegments(normalizedSeparators);
+  const firstMeaningfulIndex = absolute ? firstSegmentIndexAfterRoot(rawSegments) : 0;
+  const segments = rawSegments.filter((segment) => segment.index >= firstMeaningfulIndex);
 
   if (input.length === 0) {
     issues.push({
@@ -83,14 +100,33 @@ export function vetPath(input: unknown, options: PathVetOptions = {}): PathVetRe
     });
   }
 
-  if (options.maxLength !== undefined && input.length > options.maxLength) {
+  if (!isPathVetPlatform(platform)) {
+    issues.push({
+      code: "invalid-option",
+      message: `Unsupported platform option: ${String(platform)}.`
+    });
+  }
+
+  if (options.maxLength !== undefined && !isNonNegativeInteger(options.maxLength)) {
+    issues.push({
+      code: "invalid-option",
+      message: "maxLength must be a non-negative integer."
+    });
+  }
+
+  if (options.maxSegmentLength !== undefined && !isNonNegativeInteger(options.maxSegmentLength)) {
+    issues.push({
+      code: "invalid-option",
+      message: "maxSegmentLength must be a non-negative integer."
+    });
+  }
+
+  if (options.maxLength !== undefined && isNonNegativeInteger(options.maxLength) && input.length > options.maxLength) {
     issues.push({
       code: "path-too-long",
       message: `Path is longer than ${options.maxLength} characters.`
     });
   }
-
-  const absolute = isAbsolutePath(input, normalizedSeparators);
 
   if (absolute && !allowAbsolute) {
     issues.push({
@@ -106,37 +142,34 @@ export function vetPath(input: unknown, options: PathVetOptions = {}): PathVetRe
     });
   }
 
-  const segments = normalizedSeparators.split("/");
-  const firstMeaningfulIndex = absolute ? firstSegmentIndexAfterRoot(segments) : 0;
+  if (isPathVetPlatform(platform)) {
+    for (const segment of segments) {
+      if (absolute && isRootOnlyEmptySegment(segment, rawSegments, firstMeaningfulIndex)) {
+        continue;
+      }
 
-  for (let index = 0; index < segments.length; index += 1) {
-    const segment = segments[index] ?? "";
-    const isRootMarker = index < firstMeaningfulIndex;
+      const segmentInput: ValidateSegmentInput = {
+        segment,
+        platform,
+        allowTraversal,
+        allowEmptySegments,
+        issues
+      };
 
-    if (isRootMarker) {
-      continue;
+      if (options.maxSegmentLength !== undefined && isNonNegativeInteger(options.maxSegmentLength)) {
+        segmentInput.maxSegmentLength = options.maxSegmentLength;
+      }
+
+      validateSegment(segmentInput);
     }
-
-    const segmentInput: ValidateSegmentInput = {
-      segment,
-      index,
-      platform,
-      allowTraversal,
-      allowEmptySegments,
-      issues
-    };
-
-    if (options.maxSegmentLength !== undefined) {
-      segmentInput.maxSegmentLength = options.maxSegmentLength;
-    }
-
-    validateSegment(segmentInput);
   }
 
   return {
     valid: issues.length === 0,
     input,
     normalizedSeparators,
+    absolute,
+    segments,
     issues
   };
 }
@@ -156,8 +189,7 @@ export function assertValidPath(input: unknown, options?: PathVetOptions): strin
 }
 
 interface ValidateSegmentInput {
-  segment: string;
-  index: number;
+  segment: PathVetSegment;
   platform: PathVetPlatform;
   allowTraversal: boolean;
   allowEmptySegments: boolean;
@@ -166,92 +198,48 @@ interface ValidateSegmentInput {
 }
 
 function validateSegment(input: ValidateSegmentInput): void {
-  const { segment, index, platform, allowTraversal, allowEmptySegments, maxSegmentLength, issues } = input;
+  const { segment, platform, allowTraversal, allowEmptySegments, maxSegmentLength, issues } = input;
 
-  if (segment.length === 0) {
+  if (segment.value.length === 0) {
     if (!allowEmptySegments) {
-      issues.push({
-        code: "empty-segment",
-        message: "Path contains an empty segment.",
-        index,
-        segment
-      });
+      issues.push(segmentIssue("empty-segment", "Path contains an empty segment.", segment));
     }
 
     return;
   }
 
-  if (!allowTraversal && (segment === "." || segment === "..")) {
-    issues.push({
-      code: "traversal-not-allowed",
-      message: "Traversal segments are not allowed.",
-      index,
-      segment
-    });
+  if (!allowTraversal && (segment.value === "." || segment.value === "..")) {
+    issues.push(segmentIssue("traversal-not-allowed", "Traversal segments are not allowed.", segment));
   }
 
-  if (allowTraversal && (segment === "." || segment === "..")) {
+  if (allowTraversal && (segment.value === "." || segment.value === "..")) {
     return;
   }
 
-  if (maxSegmentLength !== undefined && segment.length > maxSegmentLength) {
-    issues.push({
-      code: "segment-too-long",
-      message: `Path segment is longer than ${maxSegmentLength} characters.`,
-      index,
-      segment
-    });
+  if (maxSegmentLength !== undefined && segment.value.length > maxSegmentLength) {
+    issues.push(segmentIssue("segment-too-long", `Path segment is longer than ${maxSegmentLength} characters.`, segment));
   }
 
-  if (segment.includes("\u0000")) {
-    issues.push({
-      code: "nul-byte",
-      message: "Path segment contains a NUL byte.",
-      index,
-      segment
-    });
-  }
-
-  if ((platform === "posix" || platform === "portable") && segment.includes("/")) {
-    issues.push({
-      code: "posix-reserved-character",
-      message: "Path segment contains a POSIX path separator.",
-      index,
-      segment
-    });
+  if (segment.value.includes("\u0000")) {
+    issues.push(segmentIssue("nul-byte", "Path segment contains a NUL byte.", segment));
   }
 
   if (platform === "windows" || platform === "portable") {
-    validateWindowsSegment(segment, index, issues);
+    validateWindowsSegment(segment, issues);
   }
 }
 
-function validateWindowsSegment(segment: string, index: number, issues: PathVetIssue[]): void {
-  if (WINDOWS_RESERVED_CHARACTERS.test(segment)) {
-    issues.push({
-      code: "windows-reserved-character",
-      message: "Path segment contains a Windows-reserved character.",
-      index,
-      segment
-    });
+function validateWindowsSegment(segment: PathVetSegment, issues: PathVetIssue[]): void {
+  if (WINDOWS_RESERVED_CHARACTERS.test(segment.value)) {
+    issues.push(segmentIssue("windows-reserved-character", "Path segment contains a Windows-reserved character.", segment));
   }
 
-  if (WINDOWS_RESERVED_NAMES.test(segment)) {
-    issues.push({
-      code: "windows-reserved-name",
-      message: "Path segment is a Windows-reserved device name.",
-      index,
-      segment
-    });
+  if (WINDOWS_RESERVED_NAMES.test(segment.value)) {
+    issues.push(segmentIssue("windows-reserved-name", "Path segment is a Windows-reserved device name.", segment));
   }
 
-  if (/[. ]$/u.test(segment)) {
-    issues.push({
-      code: "windows-trailing-dot-or-space",
-      message: "Windows path segments must not end with a dot or a space.",
-      index,
-      segment
-    });
+  if (/[. ]$/u.test(segment.value)) {
+    issues.push(segmentIssue("windows-trailing-dot-or-space", "Windows path segments must not end with a dot or a space.", segment));
   }
 }
 
@@ -259,20 +247,59 @@ function isAbsolutePath(original: string, normalized: string): boolean {
   return normalized.startsWith("/") || /^[a-z]:[\\/]/iu.test(original);
 }
 
-function firstSegmentIndexAfterRoot(segments: string[]): number {
-  if (segments[0] === "" && segments[1] === "") {
+function splitPathSegments(normalizedPath: string): PathVetSegment[] {
+  const values = normalizedPath.split("/");
+  let cursor = 0;
+
+  return values.map((value, index) => {
+    const start = cursor;
+    const end = start + value.length;
+    cursor = end + 1;
+    return { value, index, start, end };
+  });
+}
+
+function firstSegmentIndexAfterRoot(segments: PathVetSegment[]): number {
+  if (segments[0]?.value === "" && segments[1]?.value === "") {
     return 2;
   }
 
-  if (segments[0] === "") {
+  if (segments[0]?.value === "") {
     return 1;
   }
 
-  if (/^[a-z]:$/iu.test(segments[0] ?? "")) {
+  if (/^[a-z]:$/iu.test(segments[0]?.value ?? "")) {
     return 1;
   }
 
   return 0;
+}
+
+function isRootOnlyEmptySegment(
+  segment: PathVetSegment,
+  rawSegments: PathVetSegment[],
+  firstMeaningfulIndex: number
+): boolean {
+  return segment.index === firstMeaningfulIndex && segment.value === "" && rawSegments.length === firstMeaningfulIndex + 1;
+}
+
+function isPathVetPlatform(value: string): value is PathVetPlatform {
+  return value === "portable" || value === "posix" || value === "windows";
+}
+
+function isNonNegativeInteger(value: number): boolean {
+  return Number.isInteger(value) && value >= 0;
+}
+
+function segmentIssue(code: PathVetIssueCode, message: string, segment: PathVetSegment): PathVetIssue {
+  return {
+    code,
+    message,
+    segmentIndex: segment.index,
+    segment: segment.value,
+    start: segment.start,
+    end: segment.end
+  };
 }
 
 function formatFirstIssue(result: PathVetResult): string {
@@ -284,5 +311,5 @@ function formatFirstIssue(result: PathVetResult): string {
 
   return firstIssue.segment === undefined
     ? firstIssue.message
-    : `${firstIssue.message} Segment ${firstIssue.index}: ${JSON.stringify(firstIssue.segment)}.`;
+    : `${firstIssue.message} Segment ${firstIssue.segmentIndex}: ${JSON.stringify(firstIssue.segment)}.`;
 }

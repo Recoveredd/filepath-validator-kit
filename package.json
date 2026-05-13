@@ -2,10 +2,30 @@
   "name": "filepath-validator-kit",
   "version": "0.1.0",
   "description": "Validate file paths with portable, POSIX, or Windows diagnostics.",
+  "keywords": [
+    "filepath",
+    "file-path",
+    "path-validation",
+    "filename",
+    "windows-path",
+    "posix-path",
+    "diagnostics",
+    "typescript",
+    "browser",
+    "developer-tools"
+  ],
   "type": "module",
   "sideEffects": false,
   "license": "MPL-2.0",
   "author": "Recoveredd",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Recoveredd/filepath-validator-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Recoveredd/filepath-validator-kit/issues"
+  },
+  "homepage": "https://github.com/Recoveredd/filepath-validator-kit#readme",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -19,6 +39,9 @@
     "CHANGELOG.md",
     "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=20"
   },
