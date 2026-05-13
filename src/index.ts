@@ -25,6 +25,8 @@ export interface PathVetOptions {
   maxSegmentLength?: number;
 }
 
+export type FilePathValidationOptions = PathVetOptions;
+
 export interface PathVetIssue {
   code: PathVetIssueCode;
   message: string;
@@ -34,12 +36,16 @@ export interface PathVetIssue {
   end?: number;
 }
 
+export type FilePathValidationIssue = PathVetIssue;
+
 export interface PathVetSegment {
   value: string;
   index: number;
   start: number;
   end: number;
 }
+
+export type FilePathSegment = PathVetSegment;
 
 export interface PathVetResult {
   valid: boolean;
@@ -50,13 +56,15 @@ export interface PathVetResult {
   issues: PathVetIssue[];
 }
 
+export type FilePathValidationResult = PathVetResult;
+
 const WINDOWS_RESERVED_CHARACTERS = /[<>:"|?*\u0000-\u001F]/u;
 const WINDOWS_RESERVED_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu;
 
 export class PathVetError extends Error {
-  readonly result: PathVetResult;
+  readonly result: FilePathValidationResult;
 
-  constructor(result: PathVetResult) {
+  constructor(result: FilePathValidationResult) {
     super(formatFirstIssue(result));
     this.name = "PathVetError";
     this.result = result;
@@ -64,6 +72,13 @@ export class PathVetError extends Error {
 }
 
 export function vetPath(input: unknown, options: PathVetOptions = {}): PathVetResult {
+  return validateFilePath(input, options);
+}
+
+export function validateFilePath(
+  input: unknown,
+  options: FilePathValidationOptions = {}
+): FilePathValidationResult {
   const platform = options.platform ?? "portable";
   const allowAbsolute = options.allowAbsolute ?? true;
   const allowRelative = options.allowRelative ?? true;
@@ -121,7 +136,11 @@ export function vetPath(input: unknown, options: PathVetOptions = {}): PathVetRe
     });
   }
 
-  if (options.maxLength !== undefined && isNonNegativeInteger(options.maxLength) && input.length > options.maxLength) {
+  if (
+    options.maxLength !== undefined &&
+    isNonNegativeInteger(options.maxLength) &&
+    input.length > options.maxLength
+  ) {
     issues.push({
       code: "path-too-long",
       message: `Path is longer than ${options.maxLength} characters.`
@@ -174,12 +193,12 @@ export function vetPath(input: unknown, options: PathVetOptions = {}): PathVetRe
   };
 }
 
-export function isValidPath(input: unknown, options?: PathVetOptions): boolean {
-  return vetPath(input, options).valid;
+export function isValidPath(input: unknown, options?: FilePathValidationOptions): boolean {
+  return validateFilePath(input, options).valid;
 }
 
-export function assertValidPath(input: unknown, options?: PathVetOptions): string {
-  const result = vetPath(input, options);
+export function assertValidPath(input: unknown, options?: FilePathValidationOptions): string {
+  const result = validateFilePath(input, options);
 
   if (!result.valid) {
     throw new PathVetError(result);
@@ -280,7 +299,11 @@ function isRootOnlyEmptySegment(
   rawSegments: PathVetSegment[],
   firstMeaningfulIndex: number
 ): boolean {
-  return segment.index === firstMeaningfulIndex && segment.value === "" && rawSegments.length === firstMeaningfulIndex + 1;
+  return (
+    segment.index === firstMeaningfulIndex &&
+    segment.value === "" &&
+    rawSegments.length === firstMeaningfulIndex + 1
+  );
 }
 
 function isPathVetPlatform(value: string): value is PathVetPlatform {

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { PathVetError, assertValidPath, isValidPath, vetPath } from "../src/index.js";
+import { PathVetError, assertValidPath, isValidPath, validateFilePath, vetPath } from "../src/index.js";
 
-describe("vetPath", () => {
+describe("validateFilePath", () => {
   it("accepts a simple portable relative path", () => {
-    expect(vetPath("notes/2026-05-12.txt")).toEqual({
+    expect(validateFilePath("notes/2026-05-12.txt")).toEqual({
       valid: true,
       input: "notes/2026-05-12.txt",
       normalizedSeparators: "notes/2026-05-12.txt",
@@ -17,12 +17,12 @@ describe("vetPath", () => {
   });
 
   it("rejects empty and non-string input", () => {
-    expect(vetPath("").issues[0]?.code).toBe("empty-input");
-    expect(vetPath(null).issues[0]?.code).toBe("not-a-string");
+    expect(validateFilePath("").issues[0]?.code).toBe("empty-input");
+    expect(validateFilePath(null).issues[0]?.code).toBe("not-a-string");
   });
 
   it("reports Windows-reserved names with segment details and offsets", () => {
-    const result = vetPath("reports/con.txt", { platform: "portable" });
+    const result = validateFilePath("reports/con.txt", { platform: "portable" });
 
     expect(result.valid).toBe(false);
     expect(result.issues).toContainEqual({
@@ -36,28 +36,28 @@ describe("vetPath", () => {
   });
 
   it("allows Windows characters under POSIX policy", () => {
-    expect(vetPath("assets/logo?.svg", { platform: "posix" }).valid).toBe(true);
-    expect(vetPath("assets/logo?.svg", { platform: "windows" }).issues[0]?.code).toBe(
+    expect(validateFilePath("assets/logo?.svg", { platform: "posix" }).valid).toBe(true);
+    expect(validateFilePath("assets/logo?.svg", { platform: "windows" }).issues[0]?.code).toBe(
       "windows-reserved-character"
     );
   });
 
   it("enforces absolute and relative path options", () => {
-    expect(vetPath("/tmp/report.txt", { allowAbsolute: false }).issues[0]?.code).toBe(
+    expect(validateFilePath("/tmp/report.txt", { allowAbsolute: false }).issues[0]?.code).toBe(
       "absolute-not-allowed"
     );
-    expect(vetPath("tmp/report.txt", { allowRelative: false }).issues[0]?.code).toBe(
+    expect(validateFilePath("tmp/report.txt", { allowRelative: false }).issues[0]?.code).toBe(
       "relative-not-allowed"
     );
   });
 
   it("accepts absolute root paths without reporting empty segments", () => {
-    expect(vetPath("/", { platform: "posix" })).toMatchObject({
+    expect(validateFilePath("/", { platform: "posix" })).toMatchObject({
       valid: true,
       absolute: true,
       issues: []
     });
-    expect(vetPath("C:\\", { platform: "windows" })).toMatchObject({
+    expect(validateFilePath("C:\\", { platform: "windows" })).toMatchObject({
       valid: true,
       absolute: true,
       issues: []
@@ -65,32 +65,32 @@ describe("vetPath", () => {
   });
 
   it("rejects traversal and repeated separators unless allowed", () => {
-    expect(vetPath("safe/../file.txt").issues.map((issue) => issue.code)).toContain(
+    expect(validateFilePath("safe/../file.txt").issues.map((issue) => issue.code)).toContain(
       "traversal-not-allowed"
     );
-    expect(vetPath("safe//file.txt").issues.map((issue) => issue.code)).toContain("empty-segment");
+    expect(validateFilePath("safe//file.txt").issues.map((issue) => issue.code)).toContain("empty-segment");
 
     expect(
-      vetPath("safe/../file.txt", {
+      validateFilePath("safe/../file.txt", {
         allowTraversal: true
       }).valid
     ).toBe(true);
     expect(
-      vetPath("safe//file.txt", {
+      validateFilePath("safe//file.txt", {
         allowEmptySegments: true
       }).valid
     ).toBe(true);
   });
 
   it("checks length limits and invalid numeric options", () => {
-    expect(vetPath("abcdef", { maxLength: 3 }).issues[0]?.code).toBe("path-too-long");
-    expect(vetPath("abc/def", { maxSegmentLength: 2 }).issues[0]?.code).toBe("segment-too-long");
-    expect(vetPath("abc", { maxLength: -1 }).issues[0]?.code).toBe("invalid-option");
-    expect(vetPath("abc", { maxSegmentLength: 1.5 }).issues[0]?.code).toBe("invalid-option");
+    expect(validateFilePath("abcdef", { maxLength: 3 }).issues[0]?.code).toBe("path-too-long");
+    expect(validateFilePath("abc/def", { maxSegmentLength: 2 }).issues[0]?.code).toBe("segment-too-long");
+    expect(validateFilePath("abc", { maxLength: -1 }).issues[0]?.code).toBe("invalid-option");
+    expect(validateFilePath("abc", { maxSegmentLength: 1.5 }).issues[0]?.code).toBe("invalid-option");
   });
 
   it("normalizes backslash separators for diagnostics", () => {
-    const result = vetPath("safe\\aux\\file.txt");
+    const result = validateFilePath("safe\\aux\\file.txt");
 
     expect(result.normalizedSeparators).toBe("safe/aux/file.txt");
     expect(result.issues[0]).toMatchObject({
@@ -100,6 +100,10 @@ describe("vetPath", () => {
       start: 5,
       end: 8
     });
+  });
+
+  it("keeps vetPath as a short alias", () => {
+    expect(vetPath("ok/file.txt")).toEqual(validateFilePath("ok/file.txt"));
   });
 });
 

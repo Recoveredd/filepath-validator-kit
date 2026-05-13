@@ -28,12 +28,12 @@ npm install filepath-validator-kit
 ## Quick Start
 
 ```ts
-import { assertValidPath, isValidPath, vetPath } from "filepath-validator-kit";
+import { assertValidPath, isValidPath, validateFilePath } from "filepath-validator-kit";
 
 isValidPath("notes/2026-05-12.txt");
 // true
 
-const result = vetPath("reports/con.txt", { platform: "portable" });
+const result = validateFilePath("reports/con.txt", { platform: "portable" });
 
 if (!result.valid) {
   result.issues[0]?.code;
@@ -54,7 +54,7 @@ Some path validators only answer `true` or `false`. That is hard to use in produ
 `filepath-validator-kit` returns stable issue codes, source offsets and the failing path segment:
 
 ```ts
-const result = vetPath("safe//con.txt", { platform: "portable" });
+const result = validateFilePath("safe//con.txt", { platform: "portable" });
 
 result.issues;
 // [
@@ -79,34 +79,38 @@ result.issues;
 
 ## API
 
-### `vetPath(input, options?)`
+### `validateFilePath(input, options?)`
 
-Returns a `PathVetResult`:
+Returns a `FilePathValidationResult` with the original input, normalized separators, absolute-path metadata, parsed segments and structured issues.
 
 ```ts
-type PathVetResult = {
+type FilePathValidationResult = {
   valid: boolean;
   input: unknown;
   normalizedSeparators: string;
   absolute: boolean;
-  segments: PathVetSegment[];
-  issues: PathVetIssue[];
+  segments: FilePathSegment[];
+  issues: FilePathValidationIssue[];
 };
 ```
 
 Example:
 
 ```ts
-const result = vetPath("assets/logo?.svg", {
+const result = validateFilePath("assets/logo?.svg", {
   platform: "windows",
   allowAbsolute: false,
   allowTraversal: false
 });
 ```
 
+### `vetPath(input, options?)`
+
+Short alias for `validateFilePath(input, options)`. It is useful when you prefer compact names, but `validateFilePath` is the clearest default in application code.
+
 ### `isValidPath(input, options?)`
 
-Boolean shortcut for `vetPath(input, options).valid`.
+Boolean shortcut for `validateFilePath(input, options).valid`.
 
 ```ts
 isValidPath("assets/logo.svg", { platform: "portable" });
@@ -115,7 +119,7 @@ isValidPath("assets/logo.svg", { platform: "portable" });
 
 ### `assertValidPath(input, options?)`
 
-Returns the input string when it is valid or throws `PathVetError`.
+Returns the input string when it is valid or throws `PathVetError` with the full validation result attached.
 
 ```ts
 try {
@@ -126,6 +130,17 @@ try {
   }
 }
 ```
+
+### Types
+
+The package exports the descriptive `FilePath*` type names used by the main API:
+
+- `FilePathValidationOptions`
+- `FilePathValidationResult`
+- `FilePathValidationIssue`
+- `FilePathSegment`
+
+The shorter `PathVet*` type names are also exported for users who prefer the compact alias.
 
 ## Options
 
