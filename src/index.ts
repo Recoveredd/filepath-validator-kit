@@ -27,6 +27,12 @@ export interface PathVetOptions {
 
 export type FilePathValidationOptions = PathVetOptions;
 
+export interface FilePathValidator {
+  validate(input: unknown, options?: FilePathValidationOptions): FilePathValidationResult;
+  isValid(input: unknown, options?: FilePathValidationOptions): boolean;
+  assertValid(input: unknown, options?: FilePathValidationOptions): string;
+}
+
 export interface PathVetIssue {
   code: PathVetIssueCode;
   message: string;
@@ -207,6 +213,20 @@ export function assertValidPath(input: unknown, options?: FilePathValidationOpti
   return input as string;
 }
 
+export function createFilePathValidator(defaultOptions: FilePathValidationOptions = {}): FilePathValidator {
+  return {
+    validate(input, options) {
+      return validateFilePath(input, mergeOptions(defaultOptions, options));
+    },
+    isValid(input, options) {
+      return isValidPath(input, mergeOptions(defaultOptions, options));
+    },
+    assertValid(input, options) {
+      return assertValidPath(input, mergeOptions(defaultOptions, options));
+    }
+  };
+}
+
 interface ValidateSegmentInput {
   segment: PathVetSegment;
   platform: PathVetPlatform;
@@ -312,6 +332,13 @@ function isPathVetPlatform(value: string): value is PathVetPlatform {
 
 function isNonNegativeInteger(value: number): boolean {
   return Number.isInteger(value) && value >= 0;
+}
+
+function mergeOptions(
+  defaultOptions: FilePathValidationOptions,
+  options: FilePathValidationOptions | undefined
+): FilePathValidationOptions {
+  return options === undefined ? { ...defaultOptions } : { ...defaultOptions, ...options };
 }
 
 function segmentIssue(code: PathVetIssueCode, message: string, segment: PathVetSegment): PathVetIssue {

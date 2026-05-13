@@ -28,7 +28,12 @@ npm install filepath-validator-kit
 ## Quick Start
 
 ```ts
-import { assertValidPath, isValidPath, validateFilePath } from "filepath-validator-kit";
+import {
+  assertValidPath,
+  createFilePathValidator,
+  isValidPath,
+  validateFilePath
+} from "filepath-validator-kit";
 
 isValidPath("notes/2026-05-12.txt");
 // true
@@ -45,6 +50,14 @@ if (!result.valid) {
 
 assertValidPath("exports/report.csv");
 // "exports/report.csv"
+
+const uploadPath = createFilePathValidator({
+  platform: "portable",
+  allowAbsolute: false
+});
+
+uploadPath.isValid("exports/report.csv");
+// true
 ```
 
 ## Why this package
@@ -131,6 +144,25 @@ try {
 }
 ```
 
+### `createFilePathValidator(defaultOptions?)`
+
+Creates a small validator object that reuses the same defaults across a form, CLI or import pipeline. Per-call options override the defaults.
+
+```ts
+const uploadPath = createFilePathValidator({
+  platform: "portable",
+  allowAbsolute: false,
+  allowTraversal: false
+});
+
+uploadPath.validate("exports/report.csv");
+uploadPath.isValid("exports/report.csv");
+uploadPath.assertValid("exports/report.csv");
+
+uploadPath.isValid("/tmp/report.csv", { allowAbsolute: true });
+// true
+```
+
 ### Types
 
 The package exports the descriptive `FilePath*` type names used by the main API:
@@ -139,6 +171,7 @@ The package exports the descriptive `FilePath*` type names used by the main API:
 - `FilePathValidationResult`
 - `FilePathValidationIssue`
 - `FilePathSegment`
+- `FilePathValidator`
 
 The shorter `PathVet*` type names are also exported for users who prefer the compact alias.
 

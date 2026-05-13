@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { PathVetError, assertValidPath, isValidPath, validateFilePath, vetPath } from "../src/index.js";
+import {
+  PathVetError,
+  assertValidPath,
+  createFilePathValidator,
+  isValidPath,
+  validateFilePath,
+  vetPath
+} from "../src/index.js";
 
 describe("validateFilePath", () => {
   it("accepts a simple portable relative path", () => {
@@ -118,5 +125,20 @@ describe("assertValidPath", () => {
   it("returns valid input or throws a typed error", () => {
     expect(assertValidPath("ok/file.txt")).toBe("ok/file.txt");
     expect(() => assertValidPath("bad/file?.txt")).toThrow(PathVetError);
+  });
+});
+
+describe("createFilePathValidator", () => {
+  it("reuses default options and allows per-call overrides", () => {
+    const uploadPath = createFilePathValidator({
+      platform: "portable",
+      allowAbsolute: false
+    });
+
+    expect(uploadPath.isValid("exports/report.csv")).toBe(true);
+    expect(uploadPath.validate("/tmp/report.csv").issues[0]?.code).toBe("absolute-not-allowed");
+    expect(uploadPath.assertValid("exports/report.csv")).toBe("exports/report.csv");
+
+    expect(uploadPath.isValid("/tmp/report.csv", { allowAbsolute: true })).toBe(true);
   });
 });
